@@ -375,7 +375,11 @@ function addTag() {
       throw new Error('Task addTag can only be run on a clean repository. ' + 'Run "git status --porcelain" to see what blocked the task.');
     }
     return new Promise(function (resolve, _reject) {
-      gulp.src(['./app/app.ts', './package.json']).pipe(git.add()).pipe(git.commit('Update version')).on('end', resolve);
+      let files = ['./package.json'];
+      if (fs.existsSync('./app/app.ts')) {
+        files.push('./app/app.ts');
+      }
+      gulp.src(files).pipe(git.add()).pipe(git.commit('Update version')).on('end', resolve);
     });
   }).then(() => {
     return gittag('v' + version, "New version");
