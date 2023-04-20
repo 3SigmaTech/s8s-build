@@ -69,6 +69,11 @@ export function visualizejs() {
 
 
 export function css() {
+
+    if (!fs.existsSync(paths.css.src[0] as string)) {
+        return new Promise<void>((resolve) => resolve());
+    }
+
     return gulp.src(paths.css.src)
         .pipe(sass({
                 includePaths: ['node_modules']

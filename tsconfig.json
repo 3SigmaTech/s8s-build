@@ -41,13 +41,5 @@
     ],
     "exclude": [
         "node_modules"
-    ],
-    "ts-node": {
-        "transpileOnly": true,
-        "esm": true,
-        "experimentalSpecifierResolution": "node",
-        "compilerOptions": {
-            "module": "commonjs"
-        }
-    }
+    ]
 }

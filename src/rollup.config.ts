@@ -41,6 +41,10 @@ if (fs.existsSync(paths.vendor.src)) {
         globalsForVendor[vImport[3]] = vImport[2];
         externalsForVendor.push(vImport[3]);
     }
+} else {
+    // Mark ALL dependencies as external
+    const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
+    externals = Object.keys(pkg.dependencies || {});
 }
 
 let publicTSPlugin = null;
