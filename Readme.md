@@ -79,3 +79,4 @@
 - Separate dev and release tasks for faster watch-triggered builds.
 - Clean up `version.increment` code - allow for array of files instead of two (app and package).
 - Add task for initializing assorted `.ignore` files.
+- Improve `paths.paths` construct. Ideally create three separate, fully fleshed out paths objects - one for front+back-end, one for front-end, and one for back-end.
