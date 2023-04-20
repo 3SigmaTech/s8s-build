@@ -13,7 +13,7 @@
         "deploy": "npm run build",
         "devpack": "sh ./bin/devpack.sh",
         "test": "echo TODO - there are no tests",
-        "release": "npm run build && npx gulp release"
+        "release": "npm run build && npx gulp incrementVersion && npx gulp build"
     },
     "dependencies": {
         "@babel/cli": "^7.21.0",
