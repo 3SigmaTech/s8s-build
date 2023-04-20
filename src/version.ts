@@ -189,7 +189,11 @@ function addTag() {
             );
         }
         return new Promise(function (resolve, _reject) {
-            gulp.src(['./app/app.ts', './package.json'])
+            let files = ['./package.json'];
+            if (fs.existsSync('./app/app.ts')) {
+                files.push('./app/app.ts');
+            }
+            gulp.src(files)
                 .pipe(git.add())
                 .pipe(git.commit('Update version'))
                 .on('end', resolve);
