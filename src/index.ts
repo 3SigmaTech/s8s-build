@@ -183,6 +183,7 @@ export const frontbuild = gulp.parallel(vendorjs, js, css, statics);
 export const build = gulp.series(frontbuild, serverbuild);
 export const dev = gulp.series(clean, frontbuild, gulp.parallel(_watch, _devserver));
 export const release = gulp.series(clean, version.increment, build);
+export const incrementVersion = version.increment;
 
 export const makeprivateflows = gulp.series(flows.makeReleaseFlow);
 export const makepublicflows = gulp.series(flows.makePackageFlow);
