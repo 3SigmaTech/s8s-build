@@ -12,7 +12,8 @@
         "build": "rm -rf dist && rollup -c && cp -R ./bin ./dist/",
         "deploy": "npm run build",
         "devpack": "sh ./bin/devpack.sh",
-        "test": "echo TODO - there are no tests"
+        "test": "echo TODO - there are no tests",
+        "release": "npx gulp release"
     },
     "dependencies": {
         "@babel/cli": "^7.21.0",
