@@ -115,21 +115,20 @@ export const increment = () => {
     let skipApp, skipPkg;
     if (isEqual(latest, tagVersion)) {
         latest[2] = ((latest[2] ?? 0) + 1);
-    } else {
-        if (isZero(appVersion)) {
-            skipApp = true;
-        } else if (isEqual(latest, appVersion)) {
-            skipApp = true;
-            console.log('App version already incremented');
-        } else if (isEqual(latest, pkgVersion)) {
-            skipPkg = true;
-            console.log('Package version already incremented');
-        }
+    }
+    if (isZero(appVersion)) {
+        skipApp = true;
+    } else if (isEqual(latest, appVersion)) {
+        skipApp = true;
+        console.log('App version already incremented');
+    } else if (isEqual(latest, pkgVersion)) {
+        skipPkg = true;
+        console.log('Package version already incremented');
+    }
 
-        if (skipApp && skipPkg) {
-            console.log('Version already incremented');
-            return gulp.src(".");
-        }
+    if (skipApp && skipPkg) {
+        console.log('Version already incremented');
+        return gulp.src(".");
     }
 
     let latestStr = latest.join('.');
