@@ -1,0 +1,10 @@
+.github/
+.vscode/
+build/
+man/
+test/
+tests/
+rollup.config.js
+tsconfig.json
+tslint.json
+bin/

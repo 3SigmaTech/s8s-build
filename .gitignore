@@ -1,0 +1,6 @@
+node_modules/*
+express-browser-reload/*
+*.DS_Store*
+launch.json
+build/
+server/
