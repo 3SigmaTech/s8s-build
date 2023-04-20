@@ -30,11 +30,11 @@ let BACK_DIST = 'server';
 const checkDown = (curr, next) => {
   if (!fs.existsSync('./' + curr)) {
     console.log(`Changing configured directory from ${curr} to ${next}.`);
-    return next;
+    return [next, true];
   }
-  return curr;
+  return [curr, false];
 };
-FRONT_SRC = checkDown(FRONT_SRC, 'src');
+[FRONT_SRC] = checkDown(FRONT_SRC, 'src');
 const paths = {
   pkg: './package.json',
   app: BACK_SRC,
@@ -82,7 +82,23 @@ const paths = {
     dest: '/data'
   }
 };
-paths.js.src = checkDown(paths.js.src, FRONT_SRC + '/index.ts');
+let updated = false;
+[paths.js.src, updated] = checkDown(paths.js.src, FRONT_SRC + '/index.ts');
+if (updated) {
+  console.log('Sending index.js to dist folder.');
+  paths.js.flnm = 'index.js';
+}
+if (!fs.existsSync(FRONT_SRC + '/style')) {
+  console.log('Sending styles to dist folder.');
+  for (let i = 0; i < paths.css.src.length; i++) {
+    paths.css.src[i] = paths.css.src[i].replace('/style', '');
+  }
+  paths.css.src2 = paths.css.src2.replace('/style', '');
+  paths.css.dest = paths.css.dest.replace('/style', '');
+  let currStyles = paths.css.src[0];
+  let newStyle = paths.css.src[0].replace('styles', 'style');
+  [paths.css.src[0]] = checkDown(currStyles, newStyle);
+}
 
 const D3_WARNING = /Circular dependency.*d3-interpolate/;
 if (fs.existsSync(paths.vendor.src)) {
@@ -93,6 +109,10 @@ let publicTSPlugin = null;
 if (fs.existsSync(`./${paths.src}/tsconfig.json`)) {
   publicTSPlugin = typescript({
     tsconfig: `./${paths.src}/tsconfig.json`
+  });
+} else if (fs.existsSync(`./tsconfig.json`)) {
+  publicTSPlugin = typescript({
+    tsconfig: `./tsconfig.json`
   });
 }
 const devInput = {
@@ -119,8 +139,14 @@ const devInput = {
   },
   external: ['react', 'react-dom', 'd3', 'topojson-client', 'bootstrap', "react-bootstrap", "react-dnd", "react-dnd-html5-backend", "react-dnd-touch-backend", "@fullcalendar/core", "@fullcalendar/react", "@fullcalendar/daygrid", "@fullcalendar/timegrid", "@fullcalendar/interaction", "@fullcalendar/multimonth", "s8s-gtable"]
 };
+let outfileBuild = paths.build + paths.js.dest + paths.js.flnm;
+let outfileDist = paths.dist + paths.js.dest + paths.js.flnm;
+if (paths.js.flnm.indexOf('/') == -1) {
+  outfileBuild = paths.build + '/' + paths.js.flnm;
+  outfileDist = paths.dist + '/' + paths.js.flnm;
+}
 const devOutput = {
-  file: paths.build + paths.js.dest + paths.js.flnm,
+  file: outfileBuild,
   format: 'umd',
   plugins: [],
   name: 'main',
@@ -146,7 +172,7 @@ const devOutput = {
 const prodOutput = {
   ...devOutput
 };
-prodOutput.file = paths.dist + paths.js.dest + paths.js.flnm;
+prodOutput.file = outfileDist;
 prodOutput.plugins = [terser()];
 let vendorTSPlugin = null;
 if (fs.existsSync(`./${paths.vendor.dir}/tsconfig.json`)) {
@@ -496,6 +522,9 @@ function _devserver() {
   });
 }
 function serverbuild() {
+  if (!fs.existsSync(paths.app)) {
+    return new Promise(resolve => resolve());
+  }
   process.chdir(paths.app);
   let tsProject = ts.createProject(`./tsconfig.json`);
   return tsProject.src().pipe(tsProject()).js.pipe(gulp.dest(tsProject.config.compilerOptions.outDir));

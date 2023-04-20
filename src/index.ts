@@ -29,6 +29,7 @@ export function vendorjs() {
     if (!fs.existsSync(paths.vendor.src)) {
         return new Promise<void>((resolve) => resolve());
     }
+
     helpers.makeDirs();
 
     return rollup.rollup(rollupConfig.vendorInput).then((bundle) => {
@@ -146,6 +147,11 @@ function _devserver() {
 };
 
 export function serverbuild() {
+
+    if (!fs.existsSync(paths.app)) {
+        return new Promise<void>((resolve) => resolve());
+    }
+
     process.chdir(paths.app); // so directories in tsconfig make sense
     let tsProject = ts.createProject(`./tsconfig.json`);
     return tsProject.src()

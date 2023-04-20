@@ -7,15 +7,15 @@ let FRONT_BUILD = 'build';
 let BACK_SRC = 'app';
 let BACK_DIST = 'server';
 
-const checkDown = (curr:string, next:string) => {
+const checkDown = (curr:string, next:string):[string,boolean] => {
     if (!fs.existsSync('./' + curr)) {
         console.log(`Changing configured directory from ${curr} to ${next}.`);
-        return next;
+        return [next, true];
     }
-    return curr;
+    return [curr, false];
 }
 
-FRONT_SRC = checkDown(FRONT_SRC, 'src');
+[FRONT_SRC] = checkDown(FRONT_SRC, 'src');
 
 export const paths = {
     pkg: './package.json',
@@ -77,4 +77,26 @@ export const paths = {
 }
 
 // Allow for index file in main source directory
-paths.js.src = checkDown(paths.js.src, FRONT_SRC + '/index.ts');
+let updated = false;
+[paths.js.src, updated] = checkDown(paths.js.src, FRONT_SRC + '/index.ts');
+// If we're loading an index file from the src directory
+// Then we should output an index file to the dist directory
+if (updated) {
+    console.log('Sending index.js to dist folder.');
+    paths.js.flnm = 'index.js';
+}
+
+// Allow for style file in main source directory
+if (!fs.existsSync(FRONT_SRC + '/style')) {
+    console.log('Sending styles to dist folder.');
+    for (let i = 0; i < paths.css.src.length; i++) {
+        paths.css.src[i] = (paths.css.src[i] as string).replace('/style', '');
+    }
+    paths.css.src2 = paths.css.src2.replace('/style', '');
+    paths.css.dest = paths.css.dest.replace('/style', '');
+}
+
+// Allow for either styles.scss or style.scss
+let currStyles = paths.css.src[0] as string;
+let newStyle = (paths.css.src[0] as string).replace('styles', 'style');
+[paths.css.src[0]] = checkDown(currStyles, newStyle);

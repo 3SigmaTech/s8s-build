@@ -29,8 +29,10 @@ let publicTSPlugin = null;
 if (fs.existsSync(`./${paths.src}/tsconfig.json`)) {
     publicTSPlugin = typescript({
         tsconfig: `./${paths.src}/tsconfig.json`,
-        // declaration: true,
-        // declarationDir: 'dist',
+    });
+} else if (fs.existsSync(`./tsconfig.json`)) {
+    publicTSPlugin = typescript({
+        tsconfig: `./tsconfig.json`,
     });
 }
 export const devInput:RollupOptions = {
@@ -77,8 +79,14 @@ export const devInput:RollupOptions = {
     ]
 };
 
+let outfileBuild = paths.build + paths.js.dest + paths.js.flnm;
+let outfileDist = paths.dist + paths.js.dest + paths.js.flnm;
+if (paths.js.flnm.indexOf('/') == -1) {
+    outfileBuild = paths.build + '/' + paths.js.flnm;
+    outfileDist = paths.dist + '/' + paths.js.flnm;
+}
 export const devOutput:OutputOptions = {
-    file: paths.build + paths.js.dest + paths.js.flnm,
+    file: outfileBuild,
     //dir: FRONT_BUILD + paths.js.dest,
     format: 'umd',
     //format: 'esm', // needed if I want code splitting
@@ -108,7 +116,7 @@ export const devOutput:OutputOptions = {
 };
 
 export const prodOutput:OutputOptions = {...devOutput};
-prodOutput.file = paths.dist + paths.js.dest + paths.js.flnm;
+prodOutput.file = outfileDist;
 prodOutput.plugins = [terser()];
 
 

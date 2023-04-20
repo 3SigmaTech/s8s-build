@@ -6,7 +6,7 @@ export declare function js(): Promise<[rollup.RollupOutput, rollup.RollupOutput]
 export declare function visualizejs(): Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
 export declare function css(): NodeJS.ReadWriteStream;
 export declare function statics(): Promise<[NodeJS.ReadWriteStream, NodeJS.ReadWriteStream, NodeJS.ReadWriteStream]>;
-export declare function serverbuild(): NodeJS.ReadWriteStream;
+export declare function serverbuild(): NodeJS.ReadWriteStream | Promise<void>;
 export declare function clean(): Promise<void>;
 export declare const frontbuild: import("undertaker").TaskFunction;
 export declare const build: import("undertaker").TaskFunction;
