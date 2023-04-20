@@ -80,3 +80,5 @@
 - Clean up `version.increment` code - allow for array of files instead of two (app and package).
 - Add task for initializing assorted `.ignore` files.
 - Improve `paths.paths` construct. Ideally create three separate, fully fleshed out paths objects - one for front+back-end, one for front-end, and one for back-end.
+- Account for `*.d.ts` files (add to dist if we're rendering declaration maps)
+- Handle `outDir` updating in `tsconfig.json` when building JS

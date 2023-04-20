@@ -18,11 +18,29 @@ export type { InputPluginOption } from 'rollup';
 const D3_WARNING = /Circular dependency.*d3-interpolate/;
 
 // Mark all packages included in vendor.ts as external
+let globals:{[key:string]:string} = {};
+let externals:string[] = [];
+let globalsForVendor: { [key: string]: string } = {};
+let externalsForVendor: string[] = [];
+const importRegex = /import (\* as )?(.*) from ['"](.*)['"];/g;
+const skippedImportRegex = /\/\/\s?import (\* as )?(.*) from ['"](.*)['"];/g;
+
 if (fs.existsSync(paths.vendor.src)) {
     const vendorFile = fs.readFileSync(paths.vendor.src, 'utf-8');
-    console.log(vendorFile);
-    //const external = Object.keys(pkg.dependencies || {});
-    // create external and globals
+
+    let vendorImports = vendorFile.matchAll(importRegex);
+    for (const vImport of vendorImports) {
+        if (!vImport[2] || !vImport[3]) { continue; }
+        globals[vImport[3]] = vImport[2];
+        externals.push(vImport[3]);
+    }
+
+    vendorImports = vendorFile.matchAll(skippedImportRegex);
+    for (const vImport of vendorImports) {
+        if (!vImport[2] || !vImport[3]) { continue; }
+        globalsForVendor[vImport[3]] = vImport[2];
+        externalsForVendor.push(vImport[3]);
+    }
 }
 
 let publicTSPlugin = null;
@@ -61,22 +79,7 @@ export const devInput:RollupOptions = {
             return;
         }
     },
-    external: [
-        'react', 'react-dom', 'd3', 'topojson-client', 'bootstrap',
-        "react-bootstrap",
-        "react-dnd",
-        "react-dnd-html5-backend",
-        "react-dnd-touch-backend",
-        "@fullcalendar/core",
-        "@fullcalendar/react",
-        "@fullcalendar/daygrid",
-        "@fullcalendar/timegrid",
-        "@fullcalendar/interaction",
-        "@fullcalendar/multimonth",
-        "s8s-gtable"
-
-        // /node_modules/
-    ]
+    external: externals
 };
 
 let outfileBuild = paths.build + paths.js.dest + paths.js.flnm;
@@ -94,25 +97,7 @@ export const devOutput:OutputOptions = {
     //preserveModulesRoot: 'public',
     plugins: [] as Plugin[],
     name: 'main',
-    globals: {
-        "react": 'React',
-        "react-dom": 'ReactDOM',
-        "d3": 'd3',
-        "topojson-client": 'topojson',
-        "bootstrap": 'bootstrap',
-        "react-bootstrap": "ReactBootstrap",
-        "react-dnd": "ReactDND",
-        "react-dnd-html5-backend": "ReactDNDHTML5Backend",
-        "react-dnd-touch-backend": "ReactDNDTouchBackend",
-        "@fullcalendar/core": "FullCalendarCore",
-        "@fullcalendar/react": "FullCalendar",
-        "@fullcalendar/daygrid": "fcDayGridPlugin",
-        "@fullcalendar/timegrid": "fcTimeGridPlugin",
-        "@fullcalendar/interaction": "fcInteractionPlugin",
-        "@fullcalendar/multimonth": "fcMultimonthPlugin",
-        "s8s-gtable": "s8sGtable",
-
-    },
+    globals: globals
 };
 
 export const prodOutput:OutputOptions = {...devOutput};
@@ -154,9 +139,7 @@ export const vendorInput:RollupOptions = {
             return;
         }
     },
-    external: [
-        'react', 'react-dom', 'd3', 'topojson-client', 'bootstrap', 'react-bootstrap'
-    ]
+    external: externalsForVendor
 };
 
 export const vendorDevOutput: OutputOptions = {
@@ -168,14 +151,7 @@ export const vendorDevOutput: OutputOptions = {
     //preserveModulesRoot: 'public',
     plugins: [] as Plugin[],
     name: 'vendor',
-    globals: {
-        "react": 'React',
-        "react-dom": 'ReactDOM',
-        "d3": 'd3',
-        "topojson-client": 'topojson',
-        "bootstrap": 'bootstrap',
-        "react-bootstrap": "react-bootstrap",
-    },
+    globals: globalsForVendor,
     // manualChunks: (id) => {
     //     if (id.includes("node_modules")) {
     //         if (id.includes("@fullcalendar")) {

@@ -95,16 +95,41 @@ if (!fs.existsSync(FRONT_SRC + '/style')) {
   }
   paths.css.src2 = paths.css.src2.replace('/style', '');
   paths.css.dest = paths.css.dest.replace('/style', '');
-  let currStyles = paths.css.src[0];
-  let newStyle = paths.css.src[0].replace('styles', 'style');
-  [paths.css.src[0]] = checkDown(currStyles, newStyle);
 }
+let currStyles = paths.css.src[0];
+let newStyle = paths.css.src[0].replace('styles', 'style');
+[paths.css.src[0]] = checkDown(currStyles, newStyle);
 
 const D3_WARNING = /Circular dependency.*d3-interpolate/;
+let globals = {};
+let externals = [];
+let globalsForVendor = {};
+let externalsForVendor = [];
+const importRegex = /import (\* as )?(.*) from ['"](.*)['"];/g;
+const skippedImportRegex = /\/\/\s?import (\* as )?(.*) from ['"](.*)['"];/g;
 if (fs.existsSync(paths.vendor.src)) {
   const vendorFile = fs.readFileSync(paths.vendor.src, 'utf-8');
-  console.log(vendorFile);
+  let vendorImports = vendorFile.matchAll(importRegex);
+  for (const vImport of vendorImports) {
+    if (!vImport[2] || !vImport[3]) {
+      continue;
+    }
+    globals[vImport[3]] = vImport[2];
+    externals.push(vImport[3]);
+  }
+  vendorImports = vendorFile.matchAll(skippedImportRegex);
+  for (const vImport of vendorImports) {
+    if (!vImport[2] || !vImport[3]) {
+      continue;
+    }
+    globalsForVendor[vImport[3]] = vImport[2];
+    externalsForVendor.push(vImport[3]);
+  }
 }
+console.log(globals);
+console.log(externals);
+console.log(globalsForVendor);
+console.log(externalsForVendor);
 let publicTSPlugin = null;
 if (fs.existsSync(`./${paths.src}/tsconfig.json`)) {
   publicTSPlugin = typescript({
@@ -137,7 +162,7 @@ const devInput = {
       return;
     }
   },
-  external: ['react', 'react-dom', 'd3', 'topojson-client', 'bootstrap', "react-bootstrap", "react-dnd", "react-dnd-html5-backend", "react-dnd-touch-backend", "@fullcalendar/core", "@fullcalendar/react", "@fullcalendar/daygrid", "@fullcalendar/timegrid", "@fullcalendar/interaction", "@fullcalendar/multimonth", "s8s-gtable"]
+  external: externals
 };
 let outfileBuild = paths.build + paths.js.dest + paths.js.flnm;
 let outfileDist = paths.dist + paths.js.dest + paths.js.flnm;
@@ -150,24 +175,7 @@ const devOutput = {
   format: 'umd',
   plugins: [],
   name: 'main',
-  globals: {
-    "react": 'React',
-    "react-dom": 'ReactDOM',
-    "d3": 'd3',
-    "topojson-client": 'topojson',
-    "bootstrap": 'bootstrap',
-    "react-bootstrap": "ReactBootstrap",
-    "react-dnd": "ReactDND",
-    "react-dnd-html5-backend": "ReactDNDHTML5Backend",
-    "react-dnd-touch-backend": "ReactDNDTouchBackend",
-    "@fullcalendar/core": "FullCalendarCore",
-    "@fullcalendar/react": "FullCalendar",
-    "@fullcalendar/daygrid": "fcDayGridPlugin",
-    "@fullcalendar/timegrid": "fcTimeGridPlugin",
-    "@fullcalendar/interaction": "fcInteractionPlugin",
-    "@fullcalendar/multimonth": "fcMultimonthPlugin",
-    "s8s-gtable": "s8sGtable"
-  }
+  globals: globals
 };
 const prodOutput = {
   ...devOutput
@@ -201,21 +209,14 @@ const vendorInput = {
       return;
     }
   },
-  external: ['react', 'react-dom', 'd3', 'topojson-client', 'bootstrap', 'react-bootstrap']
+  external: externalsForVendor
 };
 const vendorDevOutput = {
   file: paths.build + paths.vendor.dest + paths.vendor.flnm,
   format: 'umd',
   plugins: [],
   name: 'vendor',
-  globals: {
-    "react": 'React',
-    "react-dom": 'ReactDOM',
-    "d3": 'd3',
-    "topojson-client": 'topojson',
-    "bootstrap": 'bootstrap',
-    "react-bootstrap": "react-bootstrap"
-  }
+  globals: globalsForVendor
 };
 const vendorProdOutput = {
   ...vendorDevOutput
