@@ -19,13 +19,19 @@ import ts from 'gulp-typescript';
 import * as rollup from 'rollup';
 
 import { paths } from './paths.js';
-import * as rollupConfig from './rollup.config.js';
+import * as rollupConfig from './rollup/rollupbase.js';
 import * as version from './version';
 import * as helpers from './helpers';
 import * as flows from './flows';
 
-export function vendorjs() {
 
+export function vendorjs() {
+    return _vendorjsbase(false);
+}
+function _vendorjslive() {
+    return _vendorjsbase(true);
+}
+function _vendorjsbase(iswatching?:boolean) {
     // Because of how Rollup externals are automatically
     // parsed from the vendor file, it might exist
     // but be irrelevant (all comments).
@@ -35,59 +41,90 @@ export function vendorjs() {
 
     helpers.makeDirs();
 
-    return rollup.rollup(rollupConfig.vendorInput).then((bundle) => {
-        return Promise.all([
-            bundle.write(rollupConfig.vendorDevOutput),
-            bundle.write(rollupConfig.vendorProdOutput)
-        ]);
-    });
+    let devRollup = rollup.rollup(rollupConfig.vendorDevInput)
+        .then((bundle) => bundle.write(rollupConfig.vendorDevOutput));
+
+    if (iswatching) {
+        return devRollup;
+    }
+
+    let prodRollup = rollup.rollup(rollupConfig.vendorProdInput)
+        .then((bundle) => bundle.write(rollupConfig.vendorProdOutput));
+
+    return Promise.all([devRollup, prodRollup]);
 }
 
+
 export function js() {
+    return _jsbase(false);
+}
+function _jslive() {
+    return _jsbase(true);
+}
+function _jsbase(iswatching?:boolean) {
     helpers.makeDirs();
 
-    return rollup.rollup(rollupConfig.devInput).then(bundle => {
-        return Promise.all([
-            bundle.write(rollupConfig.devOutput),
-            bundle.write(rollupConfig.prodOutput)
-        ]);
-    });
+    let devRollup = rollup.rollup(rollupConfig.devInput)
+        .then(bundle => bundle.write(rollupConfig.devOutput));
+
+    if (iswatching) {
+        return devRollup;
+    }
+
+    let prodRollup = rollup.rollup(rollupConfig.prodInput)
+        .then(bundle => bundle.write(rollupConfig.prodOutput));
+
+    return Promise.all([devRollup, prodRollup]);
 }
 
 export function visualizejs() {
     helpers.makeDirs();
 
-    let input = rollupConfig.devInput;
-    (input.plugins as rollupConfig.InputPluginOption[])
+    let prodInput = rollupConfig.prodInput;
+    (prodInput.plugins as rollupConfig.InputPluginOption[])
         .push(rollupConfig.visualizer);
         
-    return rollup.rollup(input).then(bundle => {
-        return Promise.all([
-            bundle.write(rollupConfig.devOutput),
-            bundle.write(rollupConfig.prodOutput)
-        ]);
-    });
+    let devRollup = rollup.rollup(rollupConfig.devInput)
+        .then(bundle => bundle.write(rollupConfig.devOutput));
+    let prodRollup = rollup.rollup(prodInput)
+        .then(bundle => bundle.write(rollupConfig.prodOutput));
+
+    return Promise.all([devRollup, prodRollup]);
 
 }
 
 
+
 export function css() {
+    return _cssbase(false);
+}
+function _csslive() {
+    return _cssbase(true);
+}
+function _cssbase(iswatching?:boolean) {
 
     if (!fs.existsSync(paths.css.src[0] as string)) {
         return new Promise<void>((resolve) => resolve());
     }
 
-    return gulp.src(paths.css.src)
+    let devCSS = gulp.src(paths.css.src)
         .pipe(sass({
                 includePaths: ['node_modules']
             }).on('error', sass.logError))
         .pipe(postcss([autoprefixer()]))
-        .pipe(gulp.dest(paths.build + paths.css.dest))
+        .pipe(gulp.dest(paths.build + paths.css.dest));
+    
+    if (iswatching) {
+        return devCSS;
+    }
+    let prodCSS = gulp.src(paths.css.src)
         .pipe(sass({
             outputStyle: 'compressed',
             includePaths: ['node_modules']
-        }))
+        }).on('error', sass.logError))
         .pipe(gulp.dest(paths.dist + paths.css.dest));
+    
+    return Promise.all([devCSS, prodCSS]);
 }
 
 export function statics() {
@@ -120,17 +157,17 @@ function _watch() {
     });
 
     gulp.watch(paths.js.src2,
-        gulp.series(js, browsersyncReload)
+        gulp.series(_jslive, browsersyncReload)
     );
     gulp.watch(paths.vendor.src,
-        gulp.series(vendorjs, browsersyncReload)
+        gulp.series(_vendorjslive, browsersyncReload)
     );
 
     gulp.watch(paths.ejs.src,
         gulp.series(browsersyncReload)
     );
     gulp.watch(paths.css.src2,
-        gulp.series(css, browsersyncReload)
+        gulp.series(_csslive, browsersyncReload)
     );
     gulp.watch([paths.fonts.src, paths.data.src, ...paths.img.src],
         gulp.series(statics, browsersyncReload)

@@ -2,10 +2,11 @@
 /// <reference types="undertaker" />
 /// <reference types="node" />
 import * as rollup from 'rollup';
-export declare function vendorjs(): Promise<void> | Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
-export declare function js(): Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
+export declare function vendorjs(): Promise<void> | Promise<rollup.RollupOutput> | Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
+export declare function _vendorjsbase(iswatching?: boolean): Promise<void> | Promise<rollup.RollupOutput> | Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
+export declare function js(): Promise<rollup.RollupOutput> | Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
 export declare function visualizejs(): Promise<[rollup.RollupOutput, rollup.RollupOutput]>;
-export declare function css(): NodeJS.ReadWriteStream | Promise<void>;
+export declare function css(): Promise<void> | Promise<[NodeJS.ReadWriteStream]>;
 export declare function statics(): Promise<[NodeJS.ReadWriteStream, NodeJS.ReadWriteStream, NodeJS.ReadWriteStream]>;
 export declare function serverbuild(): NodeJS.ReadWriteStream | Promise<void>;
 export declare function clean(): Promise<void>;

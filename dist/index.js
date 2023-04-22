@@ -101,11 +101,49 @@ let newStyle = paths.css.src[0].replace('styles', 'style');
 [paths.css.src[0]] = checkDown(currStyles, newStyle);
 
 const D3_WARNING = /Circular dependency.*d3-interpolate/;
+const Input = opts => {
+  let input = {
+    input: opts.input,
+    plugins: [rollupReplace({
+      'process.env.NODE_ENV': JSON.stringify('production')
+    }), resolve({
+      extensions: ['.js', '.jsx', '.ts', '.tsx']
+    }), opts.tsconfig ? typescript({
+      tsconfig: opts.tsconfig,
+      outDir: `./${opts.dest}`
+    }) : null, commonjs({
+      include: /node_modules/
+    }), babel({
+      extensions: ['.js', '.jsx', '.ts', '.tsx'],
+      presets: ["@babel/env", "@babel/preset-react"],
+      targets: {
+        "browsers": "defaults and supports es6-module"
+      },
+      babelHelpers: 'bundled',
+      exclude: 'node_modules/**'
+    })],
+    onwarn: function (warning) {
+      if (D3_WARNING.test(warning.message)) {
+        return;
+      }
+    },
+    external: opts.externals
+  };
+  let output = {
+    file: opts.output,
+    format: 'umd',
+    plugins: [opts.isproduction ? terser() : null],
+    name: 'main',
+    globals: opts.globals
+  };
+  return [input, output];
+};
+
 let globals = {};
 let externals = [];
-let globalsForVendor = {};
-let externalsForVendor = [];
-const importRegex = /import (\* as )?(.*) from ['"](.*)['"];/g;
+let vendorGlobals = {};
+let vendorExternals = [];
+const importRegex = /^(?:\/\/\s?)?import (\* as )?(.*) from ['"](.*)['"];/gm;
 const skippedImportRegex = /\/\/\s?import (\* as )?(.*) from ['"](.*)['"];/g;
 if (fs.existsSync(paths.vendor.src)) {
   const vendorFile = fs.readFileSync(paths.vendor.src, 'utf-8');
@@ -122,106 +160,73 @@ if (fs.existsSync(paths.vendor.src)) {
     if (!vImport[2] || !vImport[3]) {
       continue;
     }
-    globalsForVendor[vImport[3]] = vImport[2];
-    externalsForVendor.push(vImport[3]);
+    vendorGlobals[vImport[3]] = vImport[2];
+    vendorExternals.push(vImport[3]);
   }
 } else {
   const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf-8'));
   externals = Object.keys(pkg.dependencies || {});
 }
-let publicTSPlugin = null;
+let publicTSconfig = '';
 if (fs.existsSync(`./${paths.src}/tsconfig.json`)) {
-  publicTSPlugin = typescript({
-    tsconfig: `./${paths.src}/tsconfig.json`
-  });
+  publicTSconfig = `./${paths.src}/tsconfig.json`;
 } else if (fs.existsSync(`./tsconfig.json`)) {
-  publicTSPlugin = typescript({
-    tsconfig: `./tsconfig.json`
-  });
+  publicTSconfig = `./tsconfig.json`;
 }
-const devInput = {
-  input: paths.js.src,
-  plugins: [rollupReplace({
-    'process.env.NODE_ENV': JSON.stringify('production')
-  }), resolve({
-    extensions: ['.js', '.jsx', '.ts', '.tsx']
-  }), publicTSPlugin, commonjs({
-    include: /node_modules/
-  }), babel({
-    extensions: ['.js', '.jsx', '.ts', '.tsx'],
-    presets: ["@babel/env", "@babel/preset-react"],
-    targets: {
-      "browsers": "defaults and supports es6-module"
-    },
-    babelHelpers: 'bundled',
-    exclude: 'node_modules/**'
-  })],
-  onwarn: function (warning) {
-    if (D3_WARNING.test(warning.message)) {
-      return;
-    }
-  },
-  external: externals
-};
 let outfileBuild = paths.build + paths.js.dest + paths.js.flnm;
 let outfileDist = paths.dist + paths.js.dest + paths.js.flnm;
 if (paths.js.flnm.indexOf('/') == -1) {
   outfileBuild = paths.build + '/' + paths.js.flnm;
   outfileDist = paths.dist + '/' + paths.js.flnm;
 }
-const devOutput = {
-  file: outfileBuild,
-  format: 'umd',
-  plugins: [],
-  name: 'main',
+const devInputOpts = {
+  isproduction: false,
+  tsconfig: publicTSconfig,
+  input: paths.js.src,
+  src: paths.src,
+  dest: paths.build,
+  output: outfileBuild,
+  externals: externals,
   globals: globals
 };
-const prodOutput = {
-  ...devOutput
+const [devInput, devOutput] = Input(devInputOpts);
+const prodInputOpts = {
+  isproduction: true,
+  tsconfig: publicTSconfig,
+  input: paths.js.src,
+  src: paths.src,
+  dest: paths.dist,
+  output: outfileDist,
+  externals: externals,
+  globals: globals
 };
-prodOutput.file = outfileDist;
-prodOutput.plugins = [terser()];
-let vendorTSPlugin = null;
+const [prodInput, prodOutput] = Input(prodInputOpts);
+let vendorTSconfig = '';
 if (fs.existsSync(`./${paths.vendor.dir}/tsconfig.json`)) {
-  vendorTSPlugin = typescript({
-    tsconfig: `./${paths.vendor.dir}/tsconfig.json`
-  });
+  vendorTSconfig = `./${paths.vendor.dir}/tsconfig.json`;
 }
-const vendorInput = {
+const vendorDevInputOpts = {
+  isproduction: false,
+  tsconfig: vendorTSconfig,
   input: paths.vendor.src,
-  plugins: [rollupReplace({
-    'process.env.NODE_ENV': JSON.stringify('production')
-  }), resolve({
-    extensions: ['.js', '.jsx', '.ts', '.tsx']
-  }), vendorTSPlugin, commonjs({
-    include: /node_modules/
-  }), babel({
-    extensions: ['.js', '.jsx', '.ts', '.tsx'],
-    presets: ["@babel/env", "@babel/preset-react"],
-    targets: {
-      "browsers": "defaults and supports es6-module"
-    },
-    babelHelpers: 'bundled'
-  })],
-  onwarn: function (warning) {
-    if (D3_WARNING.test(warning.message)) {
-      return;
-    }
-  },
-  external: externalsForVendor
+  src: paths.vendor.dir,
+  dest: paths.build,
+  output: paths.build + paths.vendor.dest + paths.vendor.flnm,
+  externals: vendorExternals,
+  globals: vendorGlobals
 };
-const vendorDevOutput = {
-  file: paths.build + paths.vendor.dest + paths.vendor.flnm,
-  format: 'umd',
-  plugins: [],
-  name: 'vendor',
-  globals: globalsForVendor
+const [vendorDevInput, vendorDevOutput] = Input(vendorDevInputOpts);
+const vendorProdInputOpts = {
+  isproduction: true,
+  tsconfig: vendorTSconfig,
+  input: paths.vendor.src,
+  src: paths.vendor.dir,
+  dest: paths.dist,
+  output: paths.dist + paths.vendor.dest + paths.vendor.flnm,
+  externals: vendorExternals,
+  globals: vendorGlobals
 };
-const vendorProdOutput = {
-  ...vendorDevOutput
-};
-vendorProdOutput.file = paths.dist + paths.vendor.dest + paths.vendor.flnm;
-vendorProdOutput.plugins = [terser()];
+const [vendorProdInput, vendorProdOutput] = Input(vendorProdInputOpts);
 
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
@@ -474,38 +479,57 @@ const makePackageFlow = () => {
 const browserSync = bs.create();
 const sass = gulpSass(nodeSass);
 function vendorjs() {
+  return _vendorjsbase(false);
+}
+function _vendorjslive() {
+  return _vendorjsbase(true);
+}
+function _vendorjsbase(iswatching) {
   if (isIrrelevantFile(paths.vendor.src)) {
     return new Promise(resolve => resolve());
   }
   makeDirs$1();
-  return rollup.rollup(vendorInput).then(bundle => {
-    return Promise.all([bundle.write(vendorDevOutput), bundle.write(vendorProdOutput)]);
-  });
+  let devRollup = rollup.rollup(vendorDevInput).then(bundle => bundle.write(vendorDevOutput));
+  if (iswatching) {
+    return devRollup;
+  }
+  let prodRollup = rollup.rollup(vendorProdInput).then(bundle => bundle.write(vendorProdOutput));
+  return Promise.all([devRollup, prodRollup]);
 }
 function js() {
+  return _jsbase(false);
+}
+function _jslive() {
+  return _jsbase(true);
+}
+function _jsbase(iswatching) {
   makeDirs$1();
-  return rollup.rollup(devInput).then(bundle => {
-    return Promise.all([bundle.write(devOutput), bundle.write(prodOutput)]);
-  });
+  let devRollup = rollup.rollup(devInput).then(bundle => bundle.write(devOutput));
+  if (iswatching) {
+    return devRollup;
+  }
+  let prodRollup = rollup.rollup(prodInput).then(bundle => bundle.write(prodOutput));
+  return Promise.all([devRollup, prodRollup]);
 }
 function visualizejs() {
   makeDirs$1();
-  let input = devInput;
-  input.plugins.push(visualizer);
-  return rollup.rollup(input).then(bundle => {
-    return Promise.all([bundle.write(devOutput), bundle.write(prodOutput)]);
-  });
+  let prodInput$1 = prodInput;
+  prodInput$1.plugins.push(visualizer);
+  let devRollup = rollup.rollup(devInput).then(bundle => bundle.write(devOutput));
+  let prodRollup = rollup.rollup(prodInput$1).then(bundle => bundle.write(prodOutput));
+  return Promise.all([devRollup, prodRollup]);
 }
 function css() {
   if (!fs.existsSync(paths.css.src[0])) {
     return new Promise(resolve => resolve());
   }
-  return gulp.src(paths.css.src).pipe(sass({
+  let devCSS = gulp.src(paths.css.src).pipe(sass({
     includePaths: ['node_modules']
   }).on('error', sass.logError)).pipe(postcss([autoprefixer()])).pipe(gulp.dest(paths.build + paths.css.dest)).pipe(sass({
     outputStyle: 'compressed',
     includePaths: ['node_modules']
   })).pipe(gulp.dest(paths.dist + paths.css.dest));
+  return Promise.all([devCSS]);
 }
 function statics() {
   return Promise.all([gulp.src(paths.img.src).pipe(gulp.dest(paths.build + paths.img.dest)).pipe(gulp.dest(paths.dist + paths.img.dest)), gulp.src(paths.fonts.src).pipe(gulp.dest(paths.build + paths.fonts.dest)).pipe(gulp.dest(paths.dist + paths.fonts.dest)), gulp.src(paths.data.src).pipe(gulp.dest(paths.build + paths.data.dest)).pipe(gulp.dest(paths.dist + paths.data.dest))]);
@@ -522,8 +546,8 @@ function _watch() {
     proxy: "http://localhost:4987/",
     port: 3000
   });
-  gulp.watch(paths.js.src2, gulp.series(js, browsersyncReload));
-  gulp.watch(paths.vendor.src, gulp.series(vendorjs, browsersyncReload));
+  gulp.watch(paths.js.src2, gulp.series(_jslive, browsersyncReload));
+  gulp.watch(paths.vendor.src, gulp.series(_vendorjslive, browsersyncReload));
   gulp.watch(paths.ejs.src, gulp.series(browsersyncReload));
   gulp.watch(paths.css.src2, gulp.series(css, browsersyncReload));
   gulp.watch([paths.fonts.src, paths.data.src, ...paths.img.src], gulp.series(statics, browsersyncReload));
@@ -579,4 +603,4 @@ const incrementVersion = increment;
 const makeprivateflows = gulp.series(makeReleaseFlow);
 const makepublicflows = gulp.series(makePackageFlow);
 
-export { build, clean, css, dev, frontbuild, incrementVersion, js, makeprivateflows, makepublicflows, release, serverbuild, statics, vendorjs, visualizejs };
+export { _vendorjsbase, build, clean, css, dev, frontbuild, incrementVersion, js, makeprivateflows, makepublicflows, release, serverbuild, statics, vendorjs, visualizejs };
