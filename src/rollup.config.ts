@@ -22,7 +22,7 @@ let globals:{[key:string]:string} = {};
 let externals:string[] = [];
 let globalsForVendor: { [key: string]: string } = {};
 let externalsForVendor: string[] = [];
-const importRegex = /import (\* as )?(.*) from ['"](.*)['"];/g;
+const importRegex = /^import (\* as )?(.*) from ['"](.*)['"];/g;
 const skippedImportRegex = /\/\/\s?import (\* as )?(.*) from ['"](.*)['"];/g;
 
 if (fs.existsSync(paths.vendor.src)) {

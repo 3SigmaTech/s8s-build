@@ -397,7 +397,7 @@ function addTag() {
   });
 }
 
-function makeDirs$1() {
+const makeDirs$1 = () => {
   if (!fs.existsSync(paths.build + paths.vendor.dest)) {
     fs.mkdirSync(paths.build + paths.vendor.dest, {
       recursive: true
@@ -413,7 +413,23 @@ function makeDirs$1() {
       recursive: true
     });
   }
-}
+};
+const isIrrelevantFile = flnm => {
+  if (!fs.existsSync(flnm)) {
+    return true;
+  }
+  let file = fs.readFileSync(flnm, 'utf-8');
+  let commentRegex = /\s*\/\/.*\n+/g;
+  let multilineRegex = /\/\*([\s\S]*)?\*\//g;
+  let blankRegex = /\s/g;
+  file = file.replaceAll(commentRegex, '');
+  file = file.replaceAll(multilineRegex, '');
+  file = file.replaceAll(blankRegex, '');
+  if (!file.length) {
+    return true;
+  }
+  return false;
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -458,7 +474,7 @@ const makePackageFlow = () => {
 const browserSync = bs.create();
 const sass = gulpSass(nodeSass);
 function vendorjs() {
-  if (!fs.existsSync(paths.vendor.src)) {
+  if (isIrrelevantFile(paths.vendor.src)) {
     return new Promise(resolve => resolve());
   }
   makeDirs$1();

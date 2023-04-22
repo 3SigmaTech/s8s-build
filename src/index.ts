@@ -26,7 +26,10 @@ import * as flows from './flows';
 
 export function vendorjs() {
 
-    if (!fs.existsSync(paths.vendor.src)) {
+    // Because of how Rollup externals are automatically
+    // parsed from the vendor file, it might exist
+    // but be irrelevant (all comments).
+    if (helpers.isIrrelevantFile(paths.vendor.src)) {
         return new Promise<void>((resolve) => resolve());
     }
 
