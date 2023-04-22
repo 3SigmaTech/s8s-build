@@ -10,6 +10,7 @@ const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
 
 import { paths } from './paths';
+import { allPossibleCombinations } from './helpers';
 
 const vRegex = /"?version"?:\s*"(.*?)"/g;
 
@@ -46,9 +47,9 @@ const getTagVersion = () => {
 
 }
 
-const getFileVersion = (flnm:string) => {
+const getFileVersion = (flnm: string) => {
 
-    let fileVersion = [0,0,0];
+    let fileVersion = [0, 0, 0];
     if (fs.existsSync(flnm)) {
         let appFile = fs.readFileSync(flnm, 'utf8');
         let appV = appFile.matchAll(vRegex);
@@ -63,7 +64,7 @@ const getFileVersion = (flnm:string) => {
     return fileVersion;
 }
 
-const maxVersion = (vA:number[], vB:number[]) => {
+const maxVersion = (vA: number[], vB: number[]) => {
     if (vA.length != vB.length) {
         throw 'This function will only compare versions with the same specificity.';
     }
@@ -80,7 +81,7 @@ const maxVersion = (vA:number[], vB:number[]) => {
     return vA;
 }
 
-const isEqual = (vA:number[], vB:number[]) => {
+const isEqual = (vA: number[], vB: number[]) => {
     if (vA.length != vB.length) {
         throw 'This function will only compare versions with the same specificity.'
     }
@@ -91,72 +92,115 @@ const isEqual = (vA:number[], vB:number[]) => {
     return true;
 }
 
-const isZero = (vA:number[]) => {
+const isZero = (vA: number[]) => {
     for (let i = 0; i < vA.length; i++) {
         if (vA[i] != 0) { return false; }
     }
     return true;
 }
 
+const versionedFiles = [
+    `${paths.app}/${paths.serverscript}.ts`,
+    paths.pkg
+];
+
 export const increment = () => {
 
     let tagVersion = getTagVersion();
-    
-    // TODO: procedurally review array of files
-    let appVersion = getFileVersion(`${paths.app}/${paths.serverscript}.ts`);
-    let pkgVersion = getFileVersion(paths.pkg);
 
-    
-    let latest = maxVersion(tagVersion, appVersion);
-    latest = maxVersion(latest, pkgVersion);
+    //
+    // Retrieve the version from each versioned file
+    //
+    let fileVersions: number[][] = [];
+    for (let i = 0; i < versionedFiles.length; i++) {
+        let flnm = versionedFiles[i];
+        if (!flnm) {
+            throw 'We are missing a file in code? What??';
+        }
+        fileVersions.push(getFileVersion(flnm));
+    }
 
-    // Currently listed versions match the latest release
-    // Read: version has not been incremented
-    let skipApp, skipPkg;
+    //
+    // Find the max version across all files
+    //
+    let latest = [...tagVersion];
+    for (let i = 0; i < fileVersions.length; i++) {
+        let flVer = fileVersions[i];
+        if (!flVer) {
+            throw 'We are missing a file version.';
+        }
+        latest = maxVersion(latest, flVer);
+    }
+
+    //
+    // Increment the max version if equal to the tag version
+    // (The tag version is our source of truth)
+    //
     if (isEqual(latest, tagVersion)) {
         latest[2] = ((latest[2] ?? 0) + 1);
     }
-    if (isZero(appVersion)) {
-        skipApp = true;
-    } else if (isEqual(latest, appVersion)) {
-        skipApp = true;
-        console.log('App version already incremented');
-    } else if (isEqual(latest, pkgVersion)) {
-        skipPkg = true;
-        console.log('Package version already incremented');
+    let latestStr = latest.join('.');
+
+    //
+    // Cross reference new version with version in each file
+    //
+    let skipUpdates: boolean[] = [];
+    for (let i = 0; i < fileVersions.length; i++) {
+        let skip = false;
+        let flVer = fileVersions[i];
+        if (!flVer) {
+            throw 'We are missing a file version (but not before??).';
+        }
+        if (isZero(flVer)) {
+            skip = true;
+            console.log(`File does not exist: ${versionedFiles[i]}`);
+        } else if (isEqual(latest, flVer)) {
+            skip = true;
+            console.log(`Version already incremented in ${versionedFiles[i]}`);
+        }
+        skipUpdates.push(skip);
     }
 
-    if (skipApp && skipPkg) {
-        console.log('Version already incremented');
+    //
+    // Check if there are any files to update
+    //
+    let numSkips = 0;
+    for (let i = 0; i < skipUpdates.length; i++) {
+        if (skipUpdates[i]) {
+            numSkips++;
+        }
+    }
+    if (numSkips == skipUpdates.length) {
+        console.log('Version already incremented in all files');
         return gulp.src(".");
     }
 
-    let latestStr = latest.join('.');
-
-    let app, pkg;
-    if (!skipApp) {
-        console.log(`Incrementing version in app.ts from v${appVersion?.join('.')} to v${latestStr}`);
-        app = gulp.src('./app/app.ts')
-            .pipe(replace(vRegex, `version: "${latestStr}"`))
-            .pipe(gulp.dest('./app/'));
-    }
-    if (!skipPkg) {
-        console.log(`Incrementing version in package.json from v${pkgVersion?.join('.')} to v${latestStr}`);
-        let gaeVregex = /--version v[\d\-]* /g;
-        pkg = gulp.src('./package.json')
-            .pipe(replace(vRegex, `"version": "${latestStr}"`))
-            .pipe(replace(gaeVregex, `--version v${latest.join('-')} `))
-            .pipe(gulp.dest('./'));
-    }
-
+    //
+    // Apply the new version to each versioned file
+    //
     let fileUpdates: NodeJS.ReadWriteStream[] = [];
-    if (app && pkg) {
-        fileUpdates = [app, pkg];
-    } else if (app) {
-        fileUpdates = [app];
-    } else if (pkg) {
-        fileUpdates = [pkg];
+    for (let i = 0; i < fileVersions.length; i++) {
+        if (skipUpdates[i]) { continue; }
+        let flnm = versionedFiles[i];
+        if (!flnm) {
+            throw 'We are missing a file in code? How did we get here??';
+        }
+        console.log(`Incrementing version in ${flnm} `
+            + `from v${fileVersions[i]?.join('.')} to v${latestStr}`
+        );
+
+        let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
+
+        let flUpdate = gulp.src(flnm)
+            .pipe(replace(vRegex, `version: "${latestStr}"`))
+            .pipe(gulp.dest(path));
+
+        fileUpdates.push(flUpdate);
     }
+
+    //
+    // Execute all updates in a promise
+    //
     if (fileUpdates.length > 0) {
         return Promise.all(fileUpdates).then(() => {
             return setTimeout(() => { addTag() }, 3000);
@@ -167,15 +211,16 @@ export const increment = () => {
     );
 };
 
-const allowableChanges = [
-    ' M app/app.ts\n M package.json\n',
-    ' M app/app.ts\n',
-    ' M package.json\n',
-];
-
 function addTag() {
     let pkgFile = fs.readFileSync('./package.json');
     let version = JSON.parse(pkgFile.toString())['version'];
+
+    // Create a list of all allowable changes we will push to git
+    let gitChanges = versionedFiles.map((s) => { return ` M ${s}\n`; });
+    let allowableChanges = allPossibleCombinations(gitChanges);
+    for (let i = 0; i < allowableChanges.length; i++) {
+        allowableChanges[i] = allowableChanges[i].join('');
+    }
 
     // TODO: Rearrange to put this check in front of incrementVersion
     return gitstatus({ args: '--porcelain' }).then((changes: any) => {
@@ -189,9 +234,13 @@ function addTag() {
             );
         }
         return new Promise(function (resolve, _reject) {
-            let files = ['./package.json'];
-            if (fs.existsSync('./app/app.ts')) {
-                files.push('./app/app.ts');
+            let files = [];
+            for (let i = 0; i < versionedFiles.length; i++) {
+                let flnm = versionedFiles[i];
+                if (!flnm) { continue; }
+                if (fs.existsSync(flnm)) {
+                    files.push(flnm);
+                }
             }
             gulp.src(files)
                 .pipe(git.add())

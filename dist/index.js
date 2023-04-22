@@ -228,6 +228,83 @@ const vendorProdInputOpts = {
 };
 const [vendorProdInput, vendorProdOutput] = Input(vendorProdInputOpts);
 
+const makeDirs$1 = () => {
+  if (!fs.existsSync(paths.build + paths.vendor.dest)) {
+    fs.mkdirSync(paths.build + paths.vendor.dest, {
+      recursive: true
+    });
+  }
+  if (!fs.existsSync(paths.build + paths.js.dest)) {
+    fs.mkdirSync(paths.build + paths.js.dest, {
+      recursive: true
+    });
+  }
+  if (!fs.existsSync(paths.dist + paths.js.dest)) {
+    fs.mkdirSync(paths.dist + paths.js.dest, {
+      recursive: true
+    });
+  }
+};
+const isIrrelevantFile = flnm => {
+  if (!fs.existsSync(flnm)) {
+    return true;
+  }
+  let file = fs.readFileSync(flnm, 'utf-8');
+  let commentRegex = /\s*\/\/.*\n+/g;
+  let multilineRegex = /\/\*([\s\S]*)?\*\//g;
+  let blankRegex = /\s/g;
+  file = file.replaceAll(commentRegex, '');
+  file = file.replaceAll(multilineRegex, '');
+  file = file.replaceAll(blankRegex, '');
+  if (!file.length) {
+    return true;
+  }
+  return false;
+};
+const permutations = inputArr => {
+  let result = [];
+  const permute = function (arr) {
+    let m = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+    if (arr.length === 0) {
+      result.push(m);
+    } else {
+      for (let i = 0; i < arr.length; i++) {
+        let curr = arr.slice();
+        let next = curr.splice(i, 1);
+        permute(curr.slice(), m.concat(next));
+      }
+    }
+  };
+  permute(inputArr);
+  return result;
+};
+const powerSet = arr => {
+  let set = [],
+    listSize = arr.length,
+    combinationsCount = 1 << listSize;
+  for (let i = 1; i < combinationsCount; i++) {
+    let combination = [];
+    for (let j = 0; j < listSize; j++) {
+      if (i & 1 << j) {
+        combination.push(arr[j]);
+      }
+    }
+    set.push(combination);
+  }
+  return set;
+};
+const allPossibleCombinations = arr => {
+  let pSet = powerSet(arr);
+  let combos = [];
+  for (let i = 0; i < pSet.length; i++) {
+    if (!pSet[i]) {
+      continue;
+    }
+    combos = combos.concat(permutations(pSet[i]));
+  }
+  return combos;
+};
+
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
@@ -315,47 +392,68 @@ const isZero = vA => {
   }
   return true;
 };
+const versionedFiles = [`${paths.app}/${paths.serverscript}.ts`, paths.pkg];
 const increment = () => {
   let tagVersion = getTagVersion();
-  let appVersion = getFileVersion(`${paths.app}/${paths.serverscript}.ts`);
-  let pkgVersion = getFileVersion(paths.pkg);
-  let latest = maxVersion(tagVersion, appVersion);
-  latest = maxVersion(latest, pkgVersion);
-  let skipApp, skipPkg;
+  let fileVersions = [];
+  for (let i = 0; i < versionedFiles.length; i++) {
+    let flnm = versionedFiles[i];
+    if (!flnm) {
+      throw 'We are missing a file in code? What??';
+    }
+    fileVersions.push(getFileVersion(flnm));
+  }
+  let latest = [...tagVersion];
+  for (let i = 0; i < fileVersions.length; i++) {
+    let flVer = fileVersions[i];
+    if (!flVer) {
+      throw 'We are missing a file version.';
+    }
+    latest = maxVersion(latest, flVer);
+  }
   if (isEqual(latest, tagVersion)) {
     latest[2] = (latest[2] ?? 0) + 1;
   }
-  if (isZero(appVersion)) {
-    skipApp = true;
-  } else if (isEqual(latest, appVersion)) {
-    skipApp = true;
-    console.log('App version already incremented');
-  } else if (isEqual(latest, pkgVersion)) {
-    skipPkg = true;
-    console.log('Package version already incremented');
+  let latestStr = latest.join('.');
+  let skipUpdates = [];
+  for (let i = 0; i < fileVersions.length; i++) {
+    let skip = false;
+    let flVer = fileVersions[i];
+    if (!flVer) {
+      throw 'We are missing a file version (but not before??).';
+    }
+    if (isZero(flVer)) {
+      skip = true;
+      console.log(`File does not exist: ${versionedFiles[i]}`);
+    } else if (isEqual(latest, flVer)) {
+      skip = true;
+      console.log(`Version already incremented in ${versionedFiles[i]}`);
+    }
+    skipUpdates.push(skip);
   }
-  if (skipApp && skipPkg) {
-    console.log('Version already incremented');
+  let numSkips = 0;
+  for (let i = 0; i < skipUpdates.length; i++) {
+    if (skipUpdates[i]) {
+      numSkips++;
+    }
+  }
+  if (numSkips == skipUpdates.length) {
+    console.log('Version already incremented in all files');
     return gulp.src(".");
   }
-  let latestStr = latest.join('.');
-  let app, pkg;
-  if (!skipApp) {
-    console.log(`Incrementing version in app.ts from v${appVersion?.join('.')} to v${latestStr}`);
-    app = gulp.src('./app/app.ts').pipe(replace(vRegex, `version: "${latestStr}"`)).pipe(gulp.dest('./app/'));
-  }
-  if (!skipPkg) {
-    console.log(`Incrementing version in package.json from v${pkgVersion?.join('.')} to v${latestStr}`);
-    let gaeVregex = /--version v[\d\-]* /g;
-    pkg = gulp.src('./package.json').pipe(replace(vRegex, `"version": "${latestStr}"`)).pipe(replace(gaeVregex, `--version v${latest.join('-')} `)).pipe(gulp.dest('./'));
-  }
   let fileUpdates = [];
-  if (app && pkg) {
-    fileUpdates = [app, pkg];
-  } else if (app) {
-    fileUpdates = [app];
-  } else if (pkg) {
-    fileUpdates = [pkg];
+  for (let i = 0; i < fileVersions.length; i++) {
+    if (skipUpdates[i]) {
+      continue;
+    }
+    let flnm = versionedFiles[i];
+    if (!flnm) {
+      throw 'We are missing a file in code? How did we get here??';
+    }
+    console.log(`Incrementing version in ${flnm} ` + `from v${fileVersions[i]?.join('.')} to v${latestStr}`);
+    let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
+    let flUpdate = gulp.src(flnm).pipe(replace(vRegex, `version: "${latestStr}"`)).pipe(gulp.dest(path));
+    fileUpdates.push(flUpdate);
   }
   if (fileUpdates.length > 0) {
     return Promise.all(fileUpdates).then(() => {
@@ -366,10 +464,16 @@ const increment = () => {
   }
   throw new Error('Function incrementVersion failed to define increment task.');
 };
-const allowableChanges = [' M app/app.ts\n M package.json\n', ' M app/app.ts\n', ' M package.json\n'];
 function addTag() {
   let pkgFile = fs.readFileSync('./package.json');
   let version = JSON.parse(pkgFile.toString())['version'];
+  let gitChanges = versionedFiles.map(s => {
+    return ` M ${s}\n`;
+  });
+  let allowableChanges = allPossibleCombinations(gitChanges);
+  for (let i = 0; i < allowableChanges.length; i++) {
+    allowableChanges[i] = allowableChanges[i].join('');
+  }
   return gitstatus({
     args: '--porcelain'
   }).then(changes => {
@@ -380,9 +484,15 @@ function addTag() {
       throw new Error('Task addTag can only be run on a clean repository. ' + 'Run "git status --porcelain" to see what blocked the task.');
     }
     return new Promise(function (resolve, _reject) {
-      let files = ['./package.json'];
-      if (fs.existsSync('./app/app.ts')) {
-        files.push('./app/app.ts');
+      let files = [];
+      for (let i = 0; i < versionedFiles.length; i++) {
+        let flnm = versionedFiles[i];
+        if (!flnm) {
+          continue;
+        }
+        if (fs.existsSync(flnm)) {
+          files.push(flnm);
+        }
       }
       gulp.src(files).pipe(git.add()).pipe(git.commit('Update version')).on('end', resolve);
     });
@@ -401,40 +511,6 @@ function addTag() {
     }
   });
 }
-
-const makeDirs$1 = () => {
-  if (!fs.existsSync(paths.build + paths.vendor.dest)) {
-    fs.mkdirSync(paths.build + paths.vendor.dest, {
-      recursive: true
-    });
-  }
-  if (!fs.existsSync(paths.build + paths.js.dest)) {
-    fs.mkdirSync(paths.build + paths.js.dest, {
-      recursive: true
-    });
-  }
-  if (!fs.existsSync(paths.dist + paths.js.dest)) {
-    fs.mkdirSync(paths.dist + paths.js.dest, {
-      recursive: true
-    });
-  }
-};
-const isIrrelevantFile = flnm => {
-  if (!fs.existsSync(flnm)) {
-    return true;
-  }
-  let file = fs.readFileSync(flnm, 'utf-8');
-  let commentRegex = /\s*\/\/.*\n+/g;
-  let multilineRegex = /\/\*([\s\S]*)?\*\//g;
-  let blankRegex = /\s/g;
-  file = file.replaceAll(commentRegex, '');
-  file = file.replaceAll(multilineRegex, '');
-  file = file.replaceAll(blankRegex, '');
-  if (!file.length) {
-    return true;
-  }
-  return false;
-};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -520,16 +596,26 @@ function visualizejs() {
   return Promise.all([devRollup, prodRollup]);
 }
 function css() {
+  return _cssbase(false);
+}
+function _csslive() {
+  return _cssbase(true);
+}
+function _cssbase(iswatching) {
   if (!fs.existsSync(paths.css.src[0])) {
     return new Promise(resolve => resolve());
   }
   let devCSS = gulp.src(paths.css.src).pipe(sass({
     includePaths: ['node_modules']
-  }).on('error', sass.logError)).pipe(postcss([autoprefixer()])).pipe(gulp.dest(paths.build + paths.css.dest)).pipe(sass({
+  }).on('error', sass.logError)).pipe(postcss([autoprefixer()])).pipe(gulp.dest(paths.build + paths.css.dest));
+  if (iswatching) {
+    return devCSS;
+  }
+  let prodCSS = gulp.src(paths.css.src).pipe(sass({
     outputStyle: 'compressed',
     includePaths: ['node_modules']
-  })).pipe(gulp.dest(paths.dist + paths.css.dest));
-  return Promise.all([devCSS]);
+  }).on('error', sass.logError)).pipe(gulp.dest(paths.dist + paths.css.dest));
+  return Promise.all([devCSS, prodCSS]);
 }
 function statics() {
   return Promise.all([gulp.src(paths.img.src).pipe(gulp.dest(paths.build + paths.img.dest)).pipe(gulp.dest(paths.dist + paths.img.dest)), gulp.src(paths.fonts.src).pipe(gulp.dest(paths.build + paths.fonts.dest)).pipe(gulp.dest(paths.dist + paths.fonts.dest)), gulp.src(paths.data.src).pipe(gulp.dest(paths.build + paths.data.dest)).pipe(gulp.dest(paths.dist + paths.data.dest))]);
@@ -549,7 +635,7 @@ function _watch() {
   gulp.watch(paths.js.src2, gulp.series(_jslive, browsersyncReload));
   gulp.watch(paths.vendor.src, gulp.series(_vendorjslive, browsersyncReload));
   gulp.watch(paths.ejs.src, gulp.series(browsersyncReload));
-  gulp.watch(paths.css.src2, gulp.series(css, browsersyncReload));
+  gulp.watch(paths.css.src2, gulp.series(_csslive, browsersyncReload));
   gulp.watch([paths.fonts.src, paths.data.src, ...paths.img.src], gulp.series(statics, browsersyncReload));
 }
 function _devserver() {
@@ -603,4 +689,4 @@ const incrementVersion = increment;
 const makeprivateflows = gulp.series(makeReleaseFlow);
 const makepublicflows = gulp.series(makePackageFlow);
 
-export { _vendorjsbase, build, clean, css, dev, frontbuild, incrementVersion, js, makeprivateflows, makepublicflows, release, serverbuild, statics, vendorjs, visualizejs };
+export { build, clean, css, dev, frontbuild, incrementVersion, js, makeprivateflows, makepublicflows, release, serverbuild, statics, vendorjs, visualizejs };

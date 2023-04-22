@@ -34,3 +34,49 @@ export const isIrrelevantFile = (flnm:string) => {
 
     return false;
 }
+
+const permutations = (inputArr:any[]) => {
+    let result:any[] = [];
+
+    const permute = (arr:any[], m:any[] = []) => {
+        if (arr.length === 0) {
+            result.push(m)
+        } else {
+            for (let i = 0; i < arr.length; i++) {
+                let curr = arr.slice();
+                let next = curr.splice(i, 1);
+                permute(curr.slice(), m.concat(next))
+            }
+        }
+    }
+    permute(inputArr)
+    return result;
+}
+export const powerSet = (arr:any[]) => {
+    let set:any[] = [],
+        listSize = arr.length,
+        combinationsCount = (1 << listSize);
+
+    for (let i = 1; i < combinationsCount; i++) {
+        let combination = [];
+        for (let j = 0; j < listSize; j++) {
+            if ((i & (1 << j))) {
+                combination.push(arr[j]);
+            }
+        }
+        set.push(combination);
+    }
+    return set;
+}
+
+export const allPossibleCombinations = (arr:any[]) => {
+    let pSet = powerSet(arr);
+    let combos:any[] = [];
+    for (let i = 0; i < pSet.length; i++) {
+        if (!pSet[i]) {
+            continue;
+        }
+        combos = combos.concat(permutations(pSet[i]));
+    }
+    return combos;
+}
