@@ -366,12 +366,12 @@ const maxVersion = (vA, vB) => {
       return vA;
     }
     if (vA[i] > vB[i]) {
-      return vA;
+      return [...vA];
     } else if (vA[i] < vB[i]) {
-      return vB;
+      return [...vB];
     }
   }
-  return vA;
+  return [...vA];
 };
 const isEqual = (vA, vB) => {
   if (vA.length != vB.length) {
@@ -413,6 +413,7 @@ const increment = () => {
   }
   if (isEqual(latest, tagVersion)) {
     latest[2] = (latest[2] ?? 0) + 1;
+    console.log(`Incrementing patch release version to ${latest[2]}.`);
   }
   let latestStr = latest.join('.');
   let skipUpdates = [];

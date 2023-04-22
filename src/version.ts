@@ -72,13 +72,13 @@ const maxVersion = (vA: number[], vB: number[]) => {
         if (!vA[i]) { return vB; }
         if (!vB[i]) { return vA; }
         if ((vA[i] as number) > (vB[i] as number)) {
-            return vA;
+            return [...vA];
         } else if ((vA[i] as number) < (vB[i] as number)) {
-            return vB;
+            return [...vB];
         }
     }
     // Both are equal
-    return vA;
+    return [...vA];
 }
 
 const isEqual = (vA: number[], vB: number[]) => {
@@ -138,6 +138,7 @@ export const increment = () => {
     //
     if (isEqual(latest, tagVersion)) {
         latest[2] = ((latest[2] ?? 0) + 1);
+        console.log(`Incrementing patch release version to ${latest[2]}.`);
     }
     let latestStr = latest.join('.');
 
