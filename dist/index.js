@@ -308,7 +308,7 @@ const allPossibleCombinations = arr => {
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
-const vRegex = /"?version"?:\s*"(.*?)"/g;
+const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 const tagToArr = tag => {
   let iArr = [0, 0, 0];
   if (!tag) {
@@ -338,13 +338,17 @@ const getTagVersion = () => {
   return tagVersion;
 };
 const getFileVersion = flnm => {
+  let m1 = '',
+    m2 = '';
   let fileVersion = [0, 0, 0];
   if (fs.existsSync(flnm)) {
     let appFile = fs.readFileSync(flnm, 'utf8');
     let appV = appFile.matchAll(vRegex);
     fileVersion = [0, 0, 0];
     for (const match of appV) {
-      fileVersion = tagToArr(match[1]);
+      m1 = match[1] ?? '';
+      m2 = match[2] ?? '';
+      fileVersion = tagToArr(match[3]);
       break;
     }
     if (!fileVersion) {
@@ -352,7 +356,7 @@ const getFileVersion = flnm => {
     }
     console.log(`Found ${flnm} Version ${fileVersion.join('.')}`);
   }
-  return fileVersion;
+  return [m1, m2, fileVersion];
 };
 const maxVersion = (vA, vB) => {
   if (vA.length != vB.length) {
@@ -360,10 +364,10 @@ const maxVersion = (vA, vB) => {
   }
   for (let i = 0; i < vA.length; i++) {
     if (!vA[i]) {
-      return vB;
+      return [...vB];
     }
     if (!vB[i]) {
-      return vA;
+      return [...vA];
     }
     if (vA[i] > vB[i]) {
       return [...vA];
@@ -395,13 +399,16 @@ const isZero = vA => {
 const versionedFiles = [`${paths.app}/${paths.serverscript}.ts`, paths.pkg];
 const increment = () => {
   let tagVersion = getTagVersion();
+  let fileContext = [];
   let fileVersions = [];
   for (let i = 0; i < versionedFiles.length; i++) {
     let flnm = versionedFiles[i];
     if (!flnm) {
       throw 'We are missing a file in code? What??';
     }
-    fileVersions.push(getFileVersion(flnm));
+    let fmeta = getFileVersion(flnm);
+    fileContext.push([fmeta[0], fmeta[1]]);
+    fileVersions.push(fmeta[2]);
   }
   let latest = [...tagVersion];
   for (let i = 0; i < fileVersions.length; i++) {
@@ -420,6 +427,8 @@ const increment = () => {
   for (let i = 0; i < fileVersions.length; i++) {
     let skip = false;
     let flVer = fileVersions[i];
+    console.log(flVer);
+    console.log(latest);
     if (!flVer) {
       throw 'We are missing a file version (but not before??).';
     }
@@ -453,7 +462,9 @@ const increment = () => {
     }
     console.log(`Incrementing version in ${flnm} ` + `from v${fileVersions[i]?.join('.')} to v${latestStr}`);
     let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
-    let flUpdate = gulp.src(flnm).pipe(replace(vRegex, `version: "${latestStr}"`)).pipe(gulp.dest(path));
+    let q0 = fileContext[i]?.[0],
+      q1 = fileContext[i]?.[1];
+    let flUpdate = gulp.src(flnm).pipe(replace(vRegex, `${q0}version${q1}: "${latestStr}"`)).pipe(gulp.dest(path));
     fileUpdates.push(flUpdate);
   }
   if (fileUpdates.length > 0) {

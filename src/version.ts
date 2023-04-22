@@ -12,7 +12,7 @@ const gitpush = util.promisify(git.push);
 import { paths } from './paths';
 import { allPossibleCombinations } from './helpers';
 
-const vRegex = /"?version"?:\s*"(.*?)"/g;
+const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 
 const tagToArr = (tag?: string): [number, number, number] => {
     let iArr: [number, number, number] = [0, 0, 0];
@@ -49,19 +49,22 @@ const getTagVersion = () => {
 
 const getFileVersion = (flnm: string) => {
 
+    let m1 = '', m2 = '';
     let fileVersion = [0, 0, 0];
     if (fs.existsSync(flnm)) {
         let appFile = fs.readFileSync(flnm, 'utf8');
         let appV = appFile.matchAll(vRegex);
         fileVersion = [0, 0, 0];
         for (const match of appV) {
-            fileVersion = tagToArr(match[1]);
+            m1 = match[1] ?? '';
+            m2 = match[2] ?? '';
+            fileVersion = tagToArr(match[3]);
             break;
         }
         if (!fileVersion) { return [0, 0, 0]; }
         console.log(`Found ${flnm} Version ${fileVersion.join('.')}`);
     }
-    return fileVersion;
+    return [m1, m2, fileVersion];
 }
 
 const maxVersion = (vA: number[], vB: number[]) => {
@@ -69,8 +72,8 @@ const maxVersion = (vA: number[], vB: number[]) => {
         throw 'This function will only compare versions with the same specificity.';
     }
     for (let i = 0; i < vA.length; i++) {
-        if (!vA[i]) { return vB; }
-        if (!vB[i]) { return vA; }
+        if (!vA[i]) { return [...vB]; }
+        if (!vB[i]) { return [...vA]; }
         if ((vA[i] as number) > (vB[i] as number)) {
             return [...vA];
         } else if ((vA[i] as number) < (vB[i] as number)) {
@@ -111,13 +114,16 @@ export const increment = () => {
     //
     // Retrieve the version from each versioned file
     //
+    let fileContext: string[][] = []; // "version" or version
     let fileVersions: number[][] = [];
     for (let i = 0; i < versionedFiles.length; i++) {
         let flnm = versionedFiles[i];
         if (!flnm) {
             throw 'We are missing a file in code? What??';
         }
-        fileVersions.push(getFileVersion(flnm));
+        let fmeta = getFileVersion(flnm);
+        fileContext.push([fmeta[0] as string, fmeta[1] as string]);
+        fileVersions.push(fmeta[2] as number[]);
     }
 
     //
@@ -149,6 +155,8 @@ export const increment = () => {
     for (let i = 0; i < fileVersions.length; i++) {
         let skip = false;
         let flVer = fileVersions[i];
+        console.log(flVer);
+        console.log(latest);
         if (!flVer) {
             throw 'We are missing a file version (but not before??).';
         }
@@ -191,9 +199,9 @@ export const increment = () => {
         );
 
         let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
-
+        let q0 = fileContext[i]?.[0], q1 = fileContext[i]?.[1];
         let flUpdate = gulp.src(flnm)
-            .pipe(replace(vRegex, `version: "${latestStr}"`))
+            .pipe(replace(vRegex, `${q0}version${q1}: "${latestStr}"`))
             .pipe(gulp.dest(path));
 
         fileUpdates.push(flUpdate);
