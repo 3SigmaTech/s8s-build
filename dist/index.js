@@ -308,6 +308,7 @@ const allPossibleCombinations = arr => {
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
+const versionedFiles = [`./${paths.app}/${paths.serverscript}.ts`, paths.pkg];
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 const tagToArr = tag => {
   let iArr = [0, 0, 0];
@@ -396,7 +397,6 @@ const isZero = vA => {
   }
   return true;
 };
-const versionedFiles = [`${paths.app}/${paths.serverscript}.ts`, paths.pkg];
 const increment = () => {
   let tagVersion = getTagVersion();
   let fileContext = [];
@@ -480,7 +480,7 @@ function addTag() {
   let pkgFile = fs.readFileSync('./package.json');
   let version = JSON.parse(pkgFile.toString())['version'];
   let gitChanges = versionedFiles.map(s => {
-    return ` M ${s}\n`;
+    return ` M ${s.replace('./', '')}\n`;
   });
   let allowableChanges = allPossibleCombinations(gitChanges);
   for (let i = 0; i < allowableChanges.length; i++) {

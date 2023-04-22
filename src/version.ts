@@ -12,6 +12,11 @@ const gitpush = util.promisify(git.push);
 import { paths } from './paths';
 import { allPossibleCombinations } from './helpers';
 
+const versionedFiles = [
+    `./${paths.app}/${paths.serverscript}.ts`,
+    paths.pkg
+];
+
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 
 const tagToArr = (tag?: string): [number, number, number] => {
@@ -101,11 +106,6 @@ const isZero = (vA: number[]) => {
     }
     return true;
 }
-
-const versionedFiles = [
-    `${paths.app}/${paths.serverscript}.ts`,
-    paths.pkg
-];
 
 export const increment = () => {
 
@@ -225,7 +225,9 @@ function addTag() {
     let version = JSON.parse(pkgFile.toString())['version'];
 
     // Create a list of all allowable changes we will push to git
-    let gitChanges = versionedFiles.map((s) => { return ` M ${s}\n`; });
+    let gitChanges = versionedFiles.map((s) => {
+        return ` M ${s.replace('./', '') }\n`;
+    });
     let allowableChanges = allPossibleCombinations(gitChanges);
     for (let i = 0; i < allowableChanges.length; i++) {
         allowableChanges[i] = allowableChanges[i].join('');
