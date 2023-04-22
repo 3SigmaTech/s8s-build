@@ -1,6 +1,6 @@
 {
     "name": "s8s-build",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "Build scripts used in assorted S8S projects",
     "engines": {
         "node": "18.x",
