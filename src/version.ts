@@ -14,7 +14,8 @@ import { allPossibleCombinations } from './helpers';
 
 const versionedFiles = [
     `./${paths.app}/${paths.serverscript}.ts`,
-    paths.pkg
+    paths.pkg,
+    paths.pkg.replace(/\.json/,"-lock.json")
 ];
 
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
@@ -155,8 +156,6 @@ export const increment = () => {
     for (let i = 0; i < fileVersions.length; i++) {
         let skip = false;
         let flVer = fileVersions[i];
-        console.log(flVer);
-        console.log(latest);
         if (!flVer) {
             throw 'We are missing a file version (but not before??).';
         }
@@ -200,6 +199,7 @@ export const increment = () => {
 
         let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
         let q0 = fileContext[i]?.[0], q1 = fileContext[i]?.[1];
+        console.log(`    Replacing ${q0}version${q1}: "${latestStr}"`);
         let flUpdate = gulp.src(flnm)
             .pipe(replace(vRegex, `${q0}version${q1}: "${latestStr}"`))
             .pipe(gulp.dest(path));
@@ -212,7 +212,7 @@ export const increment = () => {
     //
     if (fileUpdates.length > 0) {
         return Promise.all(fileUpdates).then(() => {
-            return setTimeout(() => { addTag() }, 3000);
+            return setTimeout(() => { addTag() }, 5000);
         });
     }
     throw new Error(

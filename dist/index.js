@@ -308,7 +308,7 @@ const allPossibleCombinations = arr => {
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
-const versionedFiles = [`./${paths.app}/${paths.serverscript}.ts`, paths.pkg];
+const versionedFiles = [`./${paths.app}/${paths.serverscript}.ts`, paths.pkg, paths.pkg.replace(/\.json/, "-lock.json")];
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 const tagToArr = tag => {
   let iArr = [0, 0, 0];
@@ -427,8 +427,6 @@ const increment = () => {
   for (let i = 0; i < fileVersions.length; i++) {
     let skip = false;
     let flVer = fileVersions[i];
-    console.log(flVer);
-    console.log(latest);
     if (!flVer) {
       throw 'We are missing a file version (but not before??).';
     }
@@ -464,6 +462,7 @@ const increment = () => {
     let path = flnm.substring(0, flnm.lastIndexOf("/") + 1);
     let q0 = fileContext[i]?.[0],
       q1 = fileContext[i]?.[1];
+    console.log(`    Replacing ${q0}version${q1}: "${latestStr}"`);
     let flUpdate = gulp.src(flnm).pipe(replace(vRegex, `${q0}version${q1}: "${latestStr}"`)).pipe(gulp.dest(path));
     fileUpdates.push(flUpdate);
   }
@@ -471,7 +470,7 @@ const increment = () => {
     return Promise.all(fileUpdates).then(() => {
       return setTimeout(() => {
         addTag();
-      }, 3000);
+      }, 5000);
     });
   }
   throw new Error('Function incrementVersion failed to define increment task.');
