@@ -308,7 +308,7 @@ const allPossibleCombinations = arr => {
 const gittag = util.promisify(git.tag);
 const gitstatus = util.promisify(git.status);
 const gitpush = util.promisify(git.push);
-const versionedFiles = [`./${paths.app}/${paths.serverscript}.ts`, paths.pkg, paths.pkg.replace(/\.json/, "-lock.json")];
+const versionedFiles = [`./${paths.app}/${paths.serverscript}.ts`, paths.pkg];
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
 const tagToArr = tag => {
   let iArr = [0, 0, 0];
