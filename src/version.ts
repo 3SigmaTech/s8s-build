@@ -15,7 +15,7 @@ import { allPossibleCombinations } from './helpers';
 const versionedFiles = [
     `./${paths.app}/${paths.serverscript}.ts`,
     paths.pkg,
-    paths.pkg.replace(/\.json/,"-lock.json")
+    //paths.pkg.replace(/\.json/,"-lock.json")
 ];
 
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
