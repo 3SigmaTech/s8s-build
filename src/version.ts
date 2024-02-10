@@ -18,7 +18,12 @@ const versionedFiles = [
     //paths.pkg.replace(/\.json/,"-lock.json")
 ];
 
+// TODO: UPDATE REGEX AND HOW IT IS USED TO REPLACE VERSIONS
+// REGEX TO ACCOMMODATE GCLOUD APP VERSION:
+// const vRegex = /(")?version(")?:?\s*(v)?(")?((\d+(\.|-))*\d+)(")?/g; 
 const vRegex = /(")?version(")?:\s*"(.*?)"/g;
+
+
 
 const tagToArr = (tag?: string): [number, number, number] => {
     let iArr: [number, number, number] = [0, 0, 0];
